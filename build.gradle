@@ -1,0 +1,139 @@
+plugins {
+    id("java-library")
+    id("checkstyle")
+    id("com.github.spotbugs").version("5.0.7")
+    id("org.cadixdev.licenser").version("0.6.1")
+    id("maven-publish")
+}
+
+setGroup("net.elytrium")
+setVersion("1.0.0")
+
+sourceSets {
+    main.getResources().srcDir("build/natives/lib")
+}
+
+compileJava {
+    getOptions().setEncoding("UTF-8")
+    getOptions().getCompilerArgs().addAll("-h", file("src/main/c/include/jni"))
+}
+
+java {
+    setSourceCompatibility(JavaVersion.VERSION_1_8)
+    setTargetCompatibility(JavaVersion.VERSION_1_8)
+}
+
+repositories {
+    mavenCentral()
+}
+
+license {
+    setHeader(file("HEADER.txt"))
+}
+
+checkstyle {
+    setToolVersion("10.1")
+    setConfigFile(file("${this.getRootDir()}/config/checkstyle/checkstyle.xml"))
+    setConfigProperties("configDirectory": "${this.getRootDir()}/config/checkstyle")
+
+    // The build should immediately fail if we have errors.
+    setMaxErrors(0)
+    setMaxWarnings(0)
+}
+
+spotbugsMain {
+    setExcludeFilter(file("${this.getRootDir()}/config/spotbugs/suppressions.xml"))
+
+    reports {
+        html {
+            getRequired().set(true)
+            getOutputLocation().set(file("${this.getBuildDir()}/reports/spotbugs/main/spotbugs.html"))
+            setStylesheet("fancy-hist.xsl")
+        }
+    }
+}
+
+task compileNative {
+    dependsOn(compileJava)
+
+    doLast({
+        exec({
+            commandLine(
+                    "sh", "-c",
+                    "mkdir -p build/natives && " +
+                            "cd build/natives && " +
+                            "cmake ../../src/main/c"
+                            + ((System.properties['os.name'].toLowerCase().contains('windows')) ? " -G Ninja" : "")
+                            +  " -DCMAKE_BUILD_TYPE=Release && " +
+                            "cmake --build . --config Release"
+            )
+        })
+    })
+}
+
+clean {
+    doFirst({
+        delete(fileTree("src/main/c/include/jni") {
+            include("*.h")
+        })
+    })
+}
+
+task javadocJar(type: Jar) {
+    getArchiveClassifier().set("javadoc")
+    from(javadoc)
+}
+
+javadoc {
+    MinimalJavadocOptions options = getOptions()
+    options.setEncoding("UTF-8")
+    options.setCharSet("UTF-8")
+    options.setSource("8")
+    options.links("https://docs.oracle.com/en/java/javase/11/docs/api/", "https://jd.adventure.kyori.net/nbt/4.11.0/")
+
+    options.addStringOption("Xdoclint:none", "-quiet")
+
+    // Remove "undefined" from search paths when generating javadoc for a non-modular project. (JDK-8215291)
+    if (JavaVersion.current() == JavaVersion.VERSION_11) {
+        options.addBooleanOption("-no-module-directories", true)
+    }
+}
+
+task sourcesJar(type: Jar) {
+    getArchiveClassifier().set("sources")
+    from(sourceSets.main.getAllSource())
+}
+
+publishing {
+    repositories {
+        maven {
+            credentials {
+                setUsername(System.getenv("PUBLISH_USERNAME"))
+                setPassword(System.getenv("PUBLISH_PASSWORD"))
+            }
+
+            setName("elytrium-repo")
+            setUrl("https://maven.elytrium.net/repo/")
+        }
+    }
+
+    publications {
+        maven(MavenPublication) {
+            from(components.java)
+
+            artifact(javadocJar)
+            artifact(sourcesJar)
+        }
+    }
+}
+
+artifacts {
+    archives(javadocJar)
+    archives(sourcesJar)
+}
+
+tasks.withType(JavaExec) {
+    systemProperty("java.library.path", "${project.rootDir}/build/natives/lib")
+}
+
+processResources.dependsOn(compileNative)

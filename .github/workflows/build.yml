@@ -1,0 +1,39 @@
+name: Java CI with Gradle
+
+on: [ push, pull_request ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        platform: [ macos-latest, ubuntu-20.04, windows-latest ]
+      fail-fast: true
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3.0.2
+        with:
+          submodules: recursive
+      - name: Set up JDK
+        uses: actions/setup-java@v3.3.0
+        with:
+          distribution: adopt
+          java-version: 17
+      - name: Setup Ninja
+        uses: ashutoshvarma/setup-ninja@master
+        if: ${{ matrix.platform == 'windows-latest' }}
+        with:
+          version: 1.10.0
+      - name: Set up Clang
+        uses: egor-tensin/setup-clang@v1
+        if: ${{ matrix.platform == 'windows-latest' }}
+        with:
+          version: latest
+          platform: x64
+      - name: Build RNNoise
+        run: ./gradlew build
+      - name: Upload RNNoise
+        uses: actions/upload-artifact@v3.1.0
+        with:
+          name: RNNoise ${{ matrix.platform }}
+          path: "build/libs/*.jar"
