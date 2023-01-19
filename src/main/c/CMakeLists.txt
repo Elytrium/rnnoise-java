@@ -33,6 +33,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_C_FLAGS_RELEASE "-O2 -Wall -Werror -Wno-null-dereference -Wno-deprecated-declarations")
+set(CMAKE_SHARED_LIBRARY_PREFIX "lib")
 
 if (WIN32)
   add_definitions(-D_USE_MATH_DEFINES)

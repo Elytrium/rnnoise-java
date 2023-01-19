@@ -22,6 +22,7 @@ import java.io.InputStream;
 import java.nio.Buffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 
 public class RnnNative {
@@ -30,13 +31,13 @@ public class RnnNative {
     try {
       System.loadLibrary("rnnoise-native");
     } catch (UnsatisfiedLinkError e) {
-      try (InputStream inputStream = RnnNative.class.getResourceAsStream("/rnnoise-native." + getLibExtension())) {
+      try (InputStream inputStream = RnnNative.class.getResourceAsStream("/librnnoise-native." + getLibExtension())) {
         if (inputStream == null) {
           throw new IOException();
         }
 
-        Path libraryFile = Files.createTempFile("rnnoise-native", getLibExtension());
-        Files.copy(inputStream, libraryFile);
+        Path libraryFile = Files.createTempFile("librnnoise-native", getLibExtension());
+        Files.copy(inputStream, libraryFile, StandardCopyOption.REPLACE_EXISTING);
         System.load(libraryFile.toAbsolutePath().toString());
         libraryFile.toFile().deleteOnExit();
       } catch (IOException ex) {
